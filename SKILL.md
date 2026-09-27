@@ -20,7 +20,7 @@ GNOME 46+ (24.04+): Nautilus is GTK4-based. `nautilus-python` still works and th
 
 ## Safety boundaries
 
-- Everything in this skill lives under `~/.config`, `~/.local/share`, or `~/Templates` — user-space, no `sudo` needed except to `apt install` a helper package (nautilus-python, dconf-editor, gnome-tweaks, gnome-shell-extension-manager). Ask before running any `sudo apt install`, name the package and why.
+- Everything in this skill lives under `~/.config`, `~/.local/share`, or `~/Templates` (plus backup files written to `~`) — user-space, no `sudo` needed except to `apt install` a helper package (nautilus-python, dconf-editor, gnome-tweaks, gnome-shell-extension-manager). Ask before running any `sudo apt install`, name the package and why.
 - Never hand-edit the dconf database file directly. Always go through `gsettings` or `dconf write`/`dconf load`.
 - Before changing a `gsettings`/`dconf` key that isn't trivially reversible, read and record the current value first (`gsettings get <schema> <key>`), so it can be restored:
   ```
@@ -32,7 +32,7 @@ GNOME 46+ (24.04+): Nautilus is GTK4-based. `nautilus-python` still works and th
   # restore with: dconf load /org/gnome/some/path/ < backup-file
   ```
 - After a change, verify it took effect with `gsettings get` (or by observing the UI) rather than assuming the `set` succeeded.
-- Nautilus changes need `nautilus -q` (quits all Nautilus windows/process; it restarts on next open) to take effect. GNOME Shell extension/keybinding changes usually apply live; if not, Alt+F2 → `r` → Enter reloads GNOME Shell (Xorg sessions only — on Wayland the user must log out and back in).
+- Nautilus changes need `nautilus -q` (quits all Nautilus windows/process; it restarts on next open) to take effect. GNOME Shell extension/keybinding changes usually apply live; if not, Alt+F2 → `r` → Enter reloads GNOME Shell (Xorg sessions only — on Wayland the user must log out and back in). Newly *installed* (as opposed to enabled/disabled) extensions also need a log out/in on Wayland before GNOME Shell sees them.
 - Don't touch `/usr/share/nautilus-python` or other system dirs; use the user-space extension directories below.
 
 ## Workflow: add "New File"/"New Document" to the right-click menu
@@ -73,8 +73,14 @@ For entries that need conditions (only show for certain file types), icons, or i
 
 1. Install the binding: `sudo apt install python3-nautilus` (ask first — this is the one step needing sudo).
 2. Extension file goes in `~/.local/share/nautilus-python/extensions/your_extension.py`.
-3. Minimal shape (adjust per what the user wants the action to do):
+3. The `MenuProvider` API differs between versions — check which `python3-nautilus` is installed (`apt-cache policy python3-nautilus`) and use the matching shape:
+   - **GNOME 42 / Nautilus 42** (nautilus-python 1.x, `Nautilus` typelib 3.0): methods take a leading `window` argument — `get_file_items(self, window, files)`, `get_background_items(self, window, current_folder)`.
+   - **GNOME 43+ / Nautilus 43+** (nautilus-python 4.x, `Nautilus` typelib 4.0): the `window` argument was removed — `get_file_items(self, files)`, `get_background_items(self, current_folder)`. Menu item icons are no longer displayed.
+
+   Minimal shape for GNOME 43+ (for GNOME 42, change the version to `"3.0"` and add the `window` parameter):
    ```python
+   import gi
+   gi.require_version("Nautilus", "4.0")
    from gi.repository import Nautilus, GObject
 
    class ExampleExtension(GObject.GObject, Nautilus.MenuProvider):
@@ -93,8 +99,8 @@ For entries that need conditions (only show for certain file types), icons, or i
            path = file_obj.get_location().get_path()
            # do the actual work here
    ```
-   Note: GNOME 42 uses `get_file_items(self, files)`; some GNOME 43+ Nautilus builds changed this signature to drop a `window` first argument that older tutorials show (`get_file_items(self, window, files)`). If the extension silently doesn't appear, this mismatch is the first thing to check — inspect installed `nautilus-python` examples (`/usr/share/doc/python3-nautilus/` or similar) for the signature that matches the installed version rather than assuming.
-4. `nautilus -q` to reload. If it still doesn't show up, check for Python errors: `nautilus -q; nautilus --no-desktop` run from a terminal will print exceptions from the extension to stdout.
+   A signature mismatch doesn't produce a visible error in the UI — the entry just silently fails to appear — so this is the first thing to check. Installed examples (`/usr/share/doc/python3-nautilus/examples/`) show the correct signatures for the installed version.
+4. `nautilus -q` to reload. If it still doesn't show up, run `nautilus -q; nautilus` from a terminal — Python exceptions from the extension are printed there.
 
 ## Workflow: gsettings/dconf tweaks (behavior, appearance, window management, etc.)
 
@@ -111,14 +117,14 @@ For entries that need conditions (only show for certain file types), icons, or i
      "['/org/gnome/settings-daemon/plugins/media-keys/custom-keybindings/custom0/']"
    gsettings set org.gnome.settings-daemon.plugins.media-keys.custom-keybinding:/org/gnome/settings-daemon/plugins/media-keys/custom-keybindings/custom0/ name 'My Shortcut'
    gsettings set org.gnome.settings-daemon.plugins.media-keys.custom-keybinding:/org/gnome/settings-daemon/plugins/media-keys/custom-keybindings/custom0/ command '/path/to/script'
-   gsettings set org.gnome.settings-daemon.plugins.media-keys.custom-keybinding:/org/gnome/settings-daemon/plugins/media-keys/custom-keybindings/custom0/ binding '<Control><Alt>t'
+   gsettings set org.gnome.settings-daemon.plugins.media-keys.custom-keybinding:/org/gnome/settings-daemon/plugins/media-keys/custom-keybindings/custom0/ binding '<Super><Alt>m'
    ```
-   If existing custom keybindings are already present, read the current array first and append rather than overwrite it.
+   If existing custom keybindings are already present, read the current array first and append rather than overwrite it (use the next unused `customN` path). Also pick a binding that isn't already taken — e.g. `<Control><Alt>t` is Ubuntu's default terminal shortcut; check with `gsettings list-recursively | grep -F '<binding>'`.
 
 ## Workflow: GNOME Shell extensions
 
-- Prefer installing/managing through the GNOME Extensions app (`gnome-shell-extension-manager` on 22.04, built-in "Extensions" app on newer/some Ubuntu builds) or extensions.gnome.org (needs the browser connector for that domain) over hand-copying extension dirs, unless the user wants a specific dev/unpublished extension.
-- CLI alternative: `gnome-extensions list`, `gnome-extensions enable <uuid>`, `gnome-extensions disable <uuid>`.
+- Prefer installing/managing through the GNOME Extensions app (`gnome-shell-extension-manager` on 22.04, built-in "Extensions" app on newer/some Ubuntu builds) or extensions.gnome.org (needs the browser extension plus the `gnome-browser-connector` package — `chrome-gnome-shell` on 22.04) over hand-copying extension dirs, unless the user wants a specific dev/unpublished extension.
+- CLI alternative: `gnome-extensions install <file.zip>`, `gnome-extensions list --enabled`, `gnome-extensions enable <uuid>`, `gnome-extensions disable <uuid>`.
 - GNOME 42 vs 46+ matters here: an extension's `metadata.json` declares supported shell versions, and many older extensions are not updated for 46. If the user is upgrading Ubuntu versions, flag that their current extensions may need updated equivalents post-upgrade.
 
 ## Workflow: autostart applications
@@ -131,7 +137,7 @@ Name=My Startup Task
 Exec=/path/to/command
 X-GNOME-Autostart-enabled=true
 ```
-Or use the GUI: `gnome-tweaks` → Startup Applications, or the standalone "Startup Applications" app if installed.
+Or use the GUI: `gnome-tweaks` → Startup Applications on GNOME 42 (that panel was removed from newer GNOME Tweaks), or Ubuntu's standalone "Startup Applications" app (`gnome-startup-applications`) if installed.
 
 ## When something breaks
 
