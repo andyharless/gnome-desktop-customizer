@@ -16,7 +16,7 @@ gnome-shell --version
 nautilus --version
 ```
 GNOME 42 (22.04): Nautilus is still GTK3-based. `nautilus-python` extensions use the older `Nautilus.MenuProvider` API and are the standard way to add custom right-click actions.
-GNOME 46+ (24.04+): Nautilus is GTK4-based. `nautilus-python` still works and the API is largely the same, but packaging/paths can differ; verify `nautilus-python` is available via `apt-cache policy python3-nautilus` before assuming it's installable the same way. When advice differs by version, say so explicitly rather than giving one silently-version-specific answer.
+GNOME 46+ (24.04+): Nautilus is GTK4-based. `nautilus-python` still works, but its `MenuProvider` method signatures changed in Nautilus 43 (see the nautilus-python workflow below), and packaging/paths can differ; verify `nautilus-python` is available via `apt-cache policy python3-nautilus` before assuming it's installable the same way. When advice differs by version, say so explicitly rather than giving one silently-version-specific answer.
 
 ## Safety boundaries
 

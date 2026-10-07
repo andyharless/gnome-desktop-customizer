@@ -2,6 +2,11 @@
 
 All notable changes to this skill are recorded here. The format is loosely based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). The repo has no version numbers yet, so entries are grouped by date.
 
+## 2026-10-07 — Prompt audit
+
+### Fixed
+- **SKILL.md:** The GNOME 46+ overview said the nautilus-python API was "largely the same", contradicting the `MenuProvider` step, which says the signatures changed in Nautilus 43. The overview now points to that step.
+
 ## 2026-09-27 — Accuracy review
 
 A review pass over the initial files, done with Claude Code. Detailed rationale for each change: [docs/2026-09-27-review.md](docs/2026-09-27-review.md).
