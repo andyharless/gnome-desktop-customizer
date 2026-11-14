@@ -1,0 +1,7 @@
+#!/bin/bash
+# Restart the Desktop Icons NG (DING) extension without logging out.
+# Workaround for icons vanishing after screen unlock on GNOME 42/Wayland.
+UUID=ding@rastersoft.com
+gnome-extensions disable "$UUID"
+sleep 1
+gnome-extensions enable "$UUID"

@@ -1,0 +1,7 @@
+[Desktop Entry]
+Type=Application
+Name=Desktop Icons Unlock Watcher
+Comment=Restores desktop icons if they vanish after screen unlock
+Exec=sh -c '"$HOME/.local/bin/desktop-icons-unlock-watcher"'
+NoDisplay=true
+X-GNOME-Autostart-enabled=true

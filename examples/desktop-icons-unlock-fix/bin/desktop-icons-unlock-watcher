@@ -1,0 +1,31 @@
+#!/bin/bash
+# Watches for screen unlock and restarts Desktop Icons NG (DING) only if it
+# failed to place icons ("Not enough space to add icons") after the unlock.
+# Started at login via ~/.config/autostart/desktop-icons-unlock-watcher.desktop
+
+RESTART="$HOME/.local/bin/restart-desktop-icons"
+
+failed_since() {
+    journalctl --user --no-pager -o cat --since "@$1" 2>/dev/null \
+        | grep -q 'DING: Not enough space to add icons'
+}
+
+handle_unlock() {
+    local t=$(( $(date +%s) - 2 ))
+    sleep 4
+    for attempt in 1 2 3; do
+        failed_since "$t" || return 0
+        logger -t desktop-icons-watcher "icons lost after unlock; restarting DING (attempt $attempt)"
+        t=$(date +%s)
+        "$RESTART"
+        sleep 5
+    done
+    logger -t desktop-icons-watcher "DING still failing after 3 restarts"
+}
+
+gdbus monitor --session --dest org.gnome.ScreenSaver --object-path /org/gnome/ScreenSaver |
+while read -r line; do
+    case "$line" in
+        *ActiveChanged*false*) handle_unlock & ;;
+    esac
+done
